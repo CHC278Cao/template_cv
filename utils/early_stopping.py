@@ -14,16 +14,16 @@ except ImportError:
 
 
 class EarlyStopping:
-    def __init__(self, logger, cfg):
+    def __init__(self, logger, device, patience=5, mode="max", delta=0.001):
 
         self.logger = logger
-        self.patience = cfg.eval_patience
+        self.patience = patience
         self.counter = 0
-        self.mode = cfg.eval_mode
+        self.mode = mode
         self.best_score = None
         self.early_stop = False
-        self.device = cfg.device
-        self.delta = cfg.eval_delta
+        self.device = device
+        self.delta = delta
 
         if self.mode == "min":
             self.val_score = np.Inf
@@ -57,3 +57,6 @@ class EarlyStopping:
                 xm.save(model.state_dict(), model_path)
             else:
                 torch.save(model.state_dict(), model_path)
+            self.val_score = epoch_score
+        else:
+            print("epoch score is nan.")
