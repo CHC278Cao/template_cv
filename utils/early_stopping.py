@@ -1,0 +1,59 @@
+# encoding: utf-8
+"""
+@author: ccj
+@contact:
+"""
+
+import numpy as np
+
+try:
+    import torch
+    import torch_xl.core.xla_model as xm
+except ImportError:
+    import torch
+
+
+class EarlyStopping:
+    def __init__(self, logger, cfg):
+
+        self.logger = logger
+        self.patience = cfg.eval_patience
+        self.counter = 0
+        self.mode = cfg.eval_mode
+        self.best_score = None
+        self.early_stop = False
+        self.device = cfg.device
+        self.delta = cfg.eval_delta
+
+        if self.mode == "min":
+            self.val_score = np.Inf
+        else:
+            self.val_score = -np.Inf
+
+    def __call__(self, epoch_score, model, model_path):
+        if self.mode == "min":
+            score = -1.0 * epoch_score
+        else:
+            score = np.copy(epoch_score)
+
+        if self.best_score is None:
+            self.best_score = score
+            self.save_checkpoint(epoch_score, model, model_path)
+        elif score < self.best_score + self.delta:
+            self.counter += 1
+            self.logger.info(f"EarlyStopping counter: {self.counter} out of {self.patience}")
+            if self.counter >= self.patience:
+                self.early_stop = True
+        else:
+            self.best_score = score
+            self.save_checkpoint(epoch_score, model, model_path)
+            self.counter = 0
+
+    def save_checkpoint(self, epoch_score, model, model_path):
+        if epoch_score not in [-np.inf, np.inf, -np.nan, np.nan]:
+            self.logger.info(f"Validation score improve ({self.val_score} --> {epoch_score}). Saving model!")
+
+            if self.device == 'TPU':
+                xm.save(model.state_dict(), model_path)
+            else:
+                torch.save(model.state_dict(), model_path)
