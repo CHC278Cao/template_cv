@@ -136,19 +136,28 @@ def cutmix(batch: dict, cfg):
             imgs.append(img)
 
             a = w * h / img_w / img_h
-            if cfg.ohe_mode:
-                lab1 = F.one_hot(target[j], num_classes=cfg.num_class)
-                lab2 = F.one_hot(target[idx], num_classes=cfg.num_class)
+
+            if len(target.shape) < 2:
+                if cfg.ohe_mode:
+                    lab1 = F.one_hot(target[j], num_classes=cfg.num_class)
+                    lab2 = F.one_hot(target[idx], num_classes=cfg.num_class)
+                else:
+                    lab1 = target[j]
+                    lab2 = target[idx]
             else:
-                lab1 = target[j]
-                lab2 = target[idx]
+                lab1 = target[j, :]
+                lab2 = target[idx, :]
+
             labs.append((1 - a) * lab1 + a * lab2)
         else:
             imgs.append(image[j, :, :, :])
-            if cfg.ohe_mode:
-                labs.append(F.one_hot(target[j], num_classes=cfg.num_class).float())
+            if len(target.shape) < 2:
+                if cfg.ohe_mode:
+                    labs.append(F.one_hot(target[j], num_classes=cfg.num_class).float())
+                else:
+                    labs.append(target[j])
             else:
-                labs.append(target[j])
+                labs.append(target[j, :])
 
     image2 = torch.stack(imgs)
     label2 = torch.stack(labs)
@@ -180,19 +189,27 @@ def mixup(batch: dict, cfg):
             img = (1 - b) * image[j, :, :, :] + b * image[idx, :, :, :]
             imgs.append(img)
 
-            if cfg.ohe_mode:
-                lab1 = F.one_hot(target[j], num_classes=cfg.num_class)
-                lab2 = F.one_hot(target[idx], num_classes=cfg.num_class)
+            if len(target.shape) < 2:
+                if cfg.ohe_mode:
+                    lab1 = F.one_hot(target[j], num_classes=cfg.num_class)
+                    lab2 = F.one_hot(target[idx], num_classes=cfg.num_class)
+                else:
+                    lab1 = target[j]
+                    lab2 = target[idx]
             else:
-                lab1 = target[j]
-                lab2 = target[idx]
+                lab1 = target[j, :]
+                lab2 = target[idx, :]
+
             labs.append((1 - b) * lab1 + b * lab2)
         else:
             imgs.append(image[j, :, :, :])
-            if cfg.ohe_mode:
-                labs.append(F.one_hot(target[j], num_classes=cfg.num_class).float())
+            if len(target.shape) < 2:
+                if cfg.ohe_mode:
+                    labs.append(F.one_hot(target[j], num_classes=cfg.num_class).float())
+                else:
+                    labs.append(target[j])
             else:
-                labs.append(target[j])
+                labs.append(target[j, :])
 
     image2 = torch.stack(imgs)
     label2 = torch.stack(labs)
