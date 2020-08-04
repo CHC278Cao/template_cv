@@ -39,9 +39,13 @@ class EarlyStopping:
         if self.best_score is None:
             self.best_score = score
             self.save_checkpoint(epoch_score, model, model_path)
+
         elif score < self.best_score + self.delta:
             self.counter += 1
-            self.logger.info(f"EarlyStopping counter: {self.counter} out of {self.patience}")
+            if self.device == "TPU":
+                xm.master_print(f"EarlyStopping counter: {self.counter} out of {self.patience}")
+            else:
+                self.logger.info(f"EarlyStopping counter: {self.counter} out of {self.patience}")
             if self.counter >= self.patience:
                 self.early_stop = True
         else:
@@ -54,9 +58,19 @@ class EarlyStopping:
             self.logger.info(f"Validation score improve ({self.val_score} --> {epoch_score}). Saving model!")
 
             if self.device == 'TPU':
+                xm.master_print(f"Validation score improve ({self.val_score} --> {epoch_score}). Saving model!")
                 xm.save(model.state_dict(), model_path)
             else:
+                self.logger.info(f"Validation score improve ({self.val_score} --> {epoch_score}). Saving model!")
                 torch.save(model.state_dict(), model_path)
+
             self.val_score = epoch_score
+
         else:
-            print("epoch score is nan.")
+            if self.device == 'TPU':
+                xm.master_print("epoch score is nan!")
+            else:
+                self.logger.info("epoch score is nan!")
+
+    def get_stop(self):
+        return self.early_stop
