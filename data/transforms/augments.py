@@ -15,7 +15,7 @@ def get_train_transforms(cfg):
             A.VerticalFlip(p=cfg.vflip_prob),
             A.OneOf([
                 A.HueSaturationValue(hue_shift_limit=cfg.hue_limit, sat_shift_limit=cfg.sat_limit,
-                                     val_shift_limit=cfg.Ival_limit, p=cfg.hue_prob),
+                                     val_shift_limit=cfg.val_limit, p=cfg.hue_prob),
                 A.RandomBrightnessContrast(brightness_limit=cfg.brightness_limit,
                                            contrast_limit=cfg.contrast_limit, p=cfg.contrast_prob),
             ], p=0.5),
