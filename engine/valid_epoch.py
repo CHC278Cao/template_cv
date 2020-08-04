@@ -5,6 +5,8 @@
 """
 
 import gc
+
+import torch.nn.functional as F
 try:
     import torch_xla.core.xla_model as xm
 except ImportError:
@@ -42,7 +44,7 @@ def valid_epoch(model, data_loader, cfg):
             image = data["image"].to(device)
             target = data["target"].to(device)
             output = model(image)
-            loss = loss_fn()
+            loss = loss_fn(output, target, cfg=cfg)
 
             if cfg.device == "TPU":
                 reduced_loss = xm.mesh_reduce("reduce_loss", loss, reduce_fn)
@@ -51,14 +53,15 @@ def valid_epoch(model, data_loader, cfg):
                 loss_meter.update(loss.item(), image.shape[0])
 
             if 1 == output.shape[-1]:
-                output_fin.append(output.detach().cpu().numpy().tolist())
-                target_fin.append(target.detach().cpu().numpy().tolist())
+                output_fin.extend(F.sigmoid(output, dim=-1).detach().squeeze().cpu().numpy().tolist())
+                target_fin.extend(target.detach().cpu().numpy().tolist())
             else:
-                output_fin.append(torch.argmax(output).detach().cpu().numpy().tolist())
+                # output_fin.extend(torch.argmax(output, dim=-1).detach().squeeze().cpu().numpy().tolist())
+                output_fin.extend(F.softmax(output, dim=-1).detach().squeeze().cpu().numpy()[:, 1].tolist())
                 if cfg.ohe_mode:
-                    target_fin.append(torch.argmax(target).detach().cpu().numpy().tolist())
+                    target_fin.extend(torch.argmax(target, dim=-1).detach().squeeze().cpu().numpy().tolist())
                 else:
-                    target_fin.append(target.detach.cpu().numpy().tolist())
+                    target_fin.extend(target.detach.cpu().numpy().tolist())
 
             if batch_idx % 100 == 99:
                 if cfg.device == "TPU":
