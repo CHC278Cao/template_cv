@@ -7,9 +7,11 @@
 import os
 import pdb
 import cv2
+import pandas as pd
 import matplotlib.pyplot as plt
-
 from sklearn.model_selection import StratifiedKFold
+
+import torch
 from torch.utils.data import DataLoader
 
 from .datasets.utils import *
@@ -17,6 +19,12 @@ from .datasets.train_datasets import TrainDataset
 from .datasets.test_datasets import TestDataset
 from .transforms.augments import get_train_transforms, get_valid_transforms, get_test_transform
 from .transforms.utils import MixCollator
+
+try:
+    import torch_xla
+    import torch_xla.core.xla_model as xm
+except ImportError:
+    print("TPU is not used")
 
 
 def split_dataset(cfg):
@@ -64,22 +72,52 @@ def make_data_loader(cfg):
     else:
         batch_size = cfg.batch_size
 
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        pin_memory=False,
-        drop_last=True,
-        # num_workers=2,
-        collate_fn=MixCollator(cfg)
-    )
-    valid_loader = DataLoader(
-        valid_dataset,
-        batch_size=batch_size,
-        shuffle=False,
-        pin_memory=False,
-        collate_fn=MixCollator(cfg)
-    )
+    if cfg.device == "TPU":
+        train_sampler = torch.utils.data.distributed.DistributedSampler(
+            train_dataset,
+            num_replicas=xm.xrt_world_size(),
+            rank=xm.get_ordinal(),
+            shuffle=True
+        )
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=batch_size,
+            # pin_memory=False,
+            sampler=train_sampler,
+            drop_last=True,
+            # num_workers=2,
+            collate_fn=MixCollator(cfg)
+        )
+        valid_sampler = torch.utils.data.distributed.DistributedSampler(
+            valid_dataset,
+            num_replicas=xm.xrt_world_size(),
+            rank=xm.get_ordinal(),
+            shuffle=False,
+        )
+        valid_loader = DataLoader(
+            valid_dataset,
+            batch_size=batch_size,
+            sampler=valid_sampler,
+            # pin_memory=False,
+            drop_last=True,
+            collate_fn=MixCollator(cfg)
+        )
+    else:
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=batch_size,
+            # pin_memory=False,
+            drop_last=True,
+            # num_workers=2,
+            collate_fn=MixCollator(cfg)
+        )
+        valid_loader = DataLoader(
+            valid_dataset,
+            batch_size=batch_size,
+            # pin_memory=False,
+            drop_last=True,
+            collate_fn=MixCollator(cfg)
+        )
 
     return train_loader, valid_loader
 
