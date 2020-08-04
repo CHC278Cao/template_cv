@@ -29,6 +29,8 @@ class GeM(nn.Module):
     def forward(self, x):
         x = torch.clamp(x, min=self.eps).pow(self.p)
         out = F.adaptive_avg_pool2d(x, output_size=1).pow(1. / self.p)
+        out = out.reshape(x.shape[0], -1)
+
         return out
 
     def __repr__(self):
