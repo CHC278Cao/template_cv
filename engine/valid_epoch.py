@@ -53,7 +53,7 @@ def valid_epoch(model, data_loader, cfg):
                 loss_meter.update(loss.item(), image.shape[0])
 
             if 1 == output.shape[-1]:
-                output_fin.extend(F.sigmoid(output, dim=-1).detach().squeeze().cpu().numpy().tolist())
+                output_fin.extend(F.sigmoid(output).detach().squeeze().cpu().numpy().tolist())
                 target_fin.extend(target.detach().cpu().numpy().tolist())
             else:
                 # output_fin.extend(torch.argmax(output, dim=-1).detach().squeeze().cpu().numpy().tolist())
