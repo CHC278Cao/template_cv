@@ -54,7 +54,8 @@ def ce_loss_fn(outputs, targets):
     :return:
         the average cross entropy loss
     """
-    return nn.BCEWithLogitsLoss(outputs, targets.float())
+    bs = outputs.shape[0]
+    return nn.BCEWithLogitsLoss(outputs.reshape(bs, -1), targets.reshape(bs, -1).float())
 
 
 def ce_loss_label_smoothing_fn(outputs, targets, num_classes, smoothing, device, label_weight=None):
@@ -107,6 +108,9 @@ def loss_fn(outputs, targets, cfg):
             return smooth_loss_fn(outputs, targets, cfg.l1_beta)
         elif cfg.criterion == "mse":
             return mseloss_fn(outputs, targets)
+        elif cfg.criterion == "bceloss":
+            return ce_loss_fn(outputs, targets)
+        
     elif output_size > 1 and cfg.ohe_mode:
         # print("classification loss is applied in modeling")
         if cfg.criterion == "cross-entropy":
