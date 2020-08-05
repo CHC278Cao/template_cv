@@ -95,7 +95,11 @@ class Fitter:
 
             self.earlystopping(valid_fin_auc, self.model, f"model_{self.cfg.fold_idx}.bin")
 
+            if self.earlystopping.get_stop():
+                break
 
+
+    # def predict(self, test_data_loader):
 
 
 
