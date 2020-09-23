@@ -4,6 +4,8 @@
 @contact:
 """
 
+from typing import 
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,7 +16,7 @@ except ImportError:
     print("TPU is not used.")
 
 
-def mseloss_fn(outputs, targets):
+def mseloss_fn(outputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
     """
         MSELoss is applied to be as loss function
     :param outputs: Type: torch.tensor, shape is [bs, 1]
@@ -26,7 +28,7 @@ def mseloss_fn(outputs, targets):
     return nn.MSELoss()(outputs, targets.float())
 
 
-def smooth_loss_fn(outputs, targets, beta, average_apply=True):
+def smooth_loss_fn(outputs: torch.Tensor, targets: torch.Tensor, beta: int, average_apply: bool=True):
     """
         SMOOTHL1Loss is applied to be as loss function
     :param outputs: Type: torch.tensor, shape is [bs, 1]
@@ -46,7 +48,7 @@ def smooth_loss_fn(outputs, targets, beta, average_apply=True):
         return loss.sum()
 
 
-def ce_loss_fn(outputs, targets):
+def ce_loss_fn(outputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
     """
         Cross-entropy loss is applied to be as loss function
     :param outputs: Type: torch.tensor, shape is [bs, *]
@@ -55,7 +57,7 @@ def ce_loss_fn(outputs, targets):
         the average cross entropy loss
     """
     bs = outputs.shape[0]
-    return nn.BCEWithLogitsLoss(outputs.reshape(bs, -1), targets.reshape(bs, -1).float())
+    return nn.BCEWithLogitsLoss(outputs.view(bs, -1), targets.view(bs, -1).float())
 
 
 def ce_loss_label_smoothing_fn(outputs, targets, num_classes, smoothing, device, label_weight=None):
@@ -90,33 +92,33 @@ def ce_loss_label_smoothing_fn(outputs, targets, num_classes, smoothing, device,
     return loss
 
 
-def loss_fn(outputs, targets, cfg):
+def loss_fn(outputs, targets, hparams):
     """
         Loss function for training
     :param outputs: Type: torch.tensor
     :param targets: Type: torch.tensor,
-    :param cfg: config
+    :param hparams: config
     :return:
         the loss
     """
     assert (len(outputs.shape) == 2), "outputs should be 2 dimensions"
 
     output_size = outputs.shape[1]
-    if output_size == 1 and not cfg.ohe_mode:
+    if output_size == 1 and not hparams.ohe_mode:
         # print("regression loss is applied in modeling")
-        if cfg.criterion == "smooth-l1":
-            return smooth_loss_fn(outputs, targets, cfg.l1_beta)
-        elif cfg.criterion == "mse":
+        if hparams.criterion == "smooth-l1":
+            return smooth_loss_fn(outputs, targets, hparams.l1_beta)
+        elif hparams.criterion == "mse":
             return mseloss_fn(outputs, targets)
-        elif cfg.criterion == "bceloss":
+        elif hparams.criterion == "bceloss":
             return ce_loss_fn(outputs, targets)
         
-    elif output_size > 1 and cfg.ohe_mode:
+    elif output_size > 1 and hparams.ohe_mode:
         # print("classification loss is applied in modeling")
-        if cfg.criterion == "cross-entropy":
+        if hparams.criterion == "cross-entropy":
             return ce_loss_fn(outputs, targets)
-        elif cfg.criterion == "smooth-entropy":
-            return ce_loss_label_smoothing_fn(outputs, targets, cfg.num_classes,
-                                              cfg.smoothing, cfg.device, cfg.label_weight)
+        elif hparams.criterion == "smooth-entropy":
+            return ce_loss_label_smoothing_fn(outputs, targets, hparams.num_classes,
+                                              hparams.smoothing, hparams.device, hparams.label_weight)
 
 

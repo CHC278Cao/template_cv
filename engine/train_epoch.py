@@ -75,9 +75,9 @@ def train_epoch(model, data_loader, optimizer, cfg, scheduler=None):
 
         if batch_idx % 100 == 99:
             if cfg.device == "TPU":
-                xm.master_print(f"Batch Idx = {batch_idx + 1}, Loss = {loss_meter.get_avg()}")
+                xm.master_print(f"In training, Batch Idx = {batch_idx + 1}, Loss = {loss_meter.get_avg()}")
             else:
-                print(f"Batch Idx = {batch_idx + 1}, Loss = {loss_meter.get_avg()}")
+                print(f"In training, Batch Idx = {batch_idx + 1}, Loss = {loss_meter.get_avg()}")
 
         del data
         gc.collect()

@@ -4,9 +4,9 @@
 @contact:
 """
 
-import os
-import pdb
 import numpy as np
+
+from typing import List, Dict, Tuple, Any
 
 import torch
 import torch.nn.functional as F
@@ -29,7 +29,8 @@ def crop_white(image: np.ndarray, value: int = 255) -> np.ndarray:
     return image[ys.min(): ys.max()+1, xs.min(): xs.max()+1]
 
 
-def get_tiles(image: np.ndarray, tile_size: int = 256, n_tiles: int = 36, mode: int = 0) -> (dict, bool):
+def get_tiles(image: np.ndarray, tile_size: int = 256, n_tiles: int = 36,
+              mode: int = 0) -> Tuple[Dict[str, Any], bool]:
     """
         Crop big image to multiple pieces of small patches
     :param image: Type np.ndarray, image to be cropped
@@ -98,11 +99,11 @@ def glue_to_one_picture(image: np.ndarray, tile_size: int = 256, n_tiles: int = 
     return images
 
 
-def cutmix(batch: dict, cfg):
+def cutmix(batch: List[Dict[str, Any]], hparams: Dict[str, Any]) -> Dict[str, Any]:
     """
         Apply cutmix transform for one batch of images
     :param batch: Type: dict, batch of dataset (default: {"image": image, "target": target}
-    :param cfg: Type: config, config file
+    :param hparams: Type: config, config file
     :return:
         batch of dataset
     """
@@ -113,7 +114,7 @@ def cutmix(batch: dict, cfg):
 
     for j in range(batch_size):
         p = np.random.uniform(0., 1.)
-        if p >= cfg.cutmix_prob:
+        if p >= hparams["cutmix_prob"]:
             idx = int(np.random.uniform(0, batch_size))
             # choose x, y and beta dist
             x = np.random.uniform(0, img_w)
@@ -138,9 +139,9 @@ def cutmix(batch: dict, cfg):
             a = w * h / img_w / img_h
 
             if len(target.shape) < 2:
-                if cfg.ohe_mode:
-                    lab1 = F.one_hot(target[j], num_classes=cfg.num_class)
-                    lab2 = F.one_hot(target[idx], num_classes=cfg.num_class)
+                if hparams.ohe_mode:
+                    lab1 = F.one_hot(target[j], num_classes=hparams.num_class)
+                    lab2 = F.one_hot(target[idx], num_classes=hparams.num_class)
                 else:
                     lab1 = target[j]
                     lab2 = target[idx]
@@ -152,8 +153,8 @@ def cutmix(batch: dict, cfg):
         else:
             imgs.append(image[j, :, :, :])
             if len(target.shape) < 2:
-                if cfg.ohe_mode:
-                    labs.append(F.one_hot(target[j], num_classes=cfg.num_class).float())
+                if hparams.ohe_mode:
+                    labs.append(F.one_hot(target[j], num_classes=hparams.num_class).float())
                 else:
                     labs.append(target[j])
             else:
@@ -167,11 +168,11 @@ def cutmix(batch: dict, cfg):
     }
 
 
-def mixup(batch: dict, cfg):
+def mixup(batch: List[Dict[str, Any]], hparams: Dict[str, Any]) -> Dict[str, Any]:
     """
         Apply mixup transform for one batch of images
     :param batch: Type: dict, batch of dataset (default: {"image": image, "target": target}
-    :param cfg: Type: config, config file
+    :param hparams: Type: config, config file
     :return:
         batch of dataset
     """
@@ -181,7 +182,7 @@ def mixup(batch: dict, cfg):
 
     for j in range(batch_size):
         p = np.random.uniform(0., 1.)
-        if p >= cfg.mixup_prob:
+        if p >= hparams["mixup_prob"]:
             idx = int(np.random.uniform(0, batch_size))
             # choose beta dist
             b = np.random.uniform(0., 1.)
@@ -190,9 +191,9 @@ def mixup(batch: dict, cfg):
             imgs.append(img)
 
             if len(target.shape) < 2:
-                if cfg.ohe_mode:
-                    lab1 = F.one_hot(target[j], num_classes=cfg.num_class)
-                    lab2 = F.one_hot(target[idx], num_classes=cfg.num_class)
+                if hparams.ohe_mode:
+                    lab1 = F.one_hot(target[j], num_classes=hparams.num_class)
+                    lab2 = F.one_hot(target[idx], num_classes=hparams.num_class)
                 else:
                     lab1 = target[j]
                     lab2 = target[idx]
@@ -204,8 +205,8 @@ def mixup(batch: dict, cfg):
         else:
             imgs.append(image[j, :, :, :])
             if len(target.shape) < 2:
-                if cfg.ohe_mode:
-                    labs.append(F.one_hot(target[j], num_classes=cfg.num_class).float())
+                if hparams.ohe_mode:
+                    labs.append(F.one_hot(target[j], num_classes=hparams.num_class).float())
                 else:
                     labs.append(target[j])
             else:
@@ -220,16 +221,16 @@ def mixup(batch: dict, cfg):
 
 
 class MixCollator:
-    def __init__(self, cfg):
+    def __init__(self, hparams: Dict[str, Any]):
         super(MixCollator, self).__init__()
-        self.cfg = cfg
+        self.hparams = hparams
 
-    def __call__(self, batch):
+    def __call__(self, batch: List[Dict[str, Any]]) -> Dict[str, Any]:
         batch = torch.utils.data.dataloader.default_collate(batch)
-        if self.cfg.cutmix_mode:
-            batch = cutmix(batch, self.cfg)
-        if self.cfg.mixup_mode:
-            batch = mixup(batch, self.cfg)
+        if self.hparams["mix_aug"]["cutmix"]:
+            batch = cutmix(batch, self.hparams)
+        if self.hparams["mix_aug"]["mixup"]:
+            batch = mixup(batch, self.hparams)
 
         return batch
 
