@@ -4,8 +4,12 @@
 @contact:
 """
 
-import numpy as np
+from typing import List, Dict, Any
+from collections import OrderedDict
 
+
+import apex
+import numpy as np
 from sklearn import metrics
 
 try:
@@ -20,30 +24,42 @@ from solver.scheduler import make_scheduler
 from engine.utils import reduce_fn
 from .train_epoch import train_epoch
 from .valid_epoch import valid_epoch
-from .test_epoch import predict
+from .test_epoch import test_epoch
 
 
 class Fitter:
-    def __init__(self, model, cfg, logger, earlystopping):
+    def __init__(self, model, hparams, logger, earlystopping):
         """
 
         :param model:
-        :param cfg:
+        :param hparams:
         :param logger:
         :param meter_averager:
         """
         super(Fitter, self).__init__()
         self.model = model
-        self.cfg = cfg
+        self.hparams = hparams
         self.logger = logger
         self.earlystopping = earlystopping
 
-        if cfg.device == "TPU":
+        corrections: Dict[str, str] = {"model.": ""}
+
+        if "weights" in self.hparams:
+            checkpoint = load_checkpoint(file_path=self.hparams["weights"], rename_in_layers=corrections)
+            self.model.load_state_dict(checkpoint["state_dict"])
+
+        if self.hparams["sync_bn"]:
+            self.model = apex.parallel.convert_syncbn_model(self.model)
+
+
+        if self.hparams["device"] == "TPU":
             self.device = xm.xla_device()
-        elif cfg.device == "GPU":
+        elif self.hparams["device"] == "GPU":
             self.device = torch.device("cuda")
         else:
             self.device = torch.device("cpu")
+
+
 
         self.model.to(self.device)
 
@@ -51,8 +67,8 @@ class Fitter:
 
     def train(self, train_data_loader, valid_data_loader, optimizer, scheduler):
 
-        for epoch in range(self.cfg.epochs):
-            if self.cfg.device == "TPU":
+        for epoch in range(self.hparams.epochs):
+            if self.hparams.device == "TPU":
                 train_para_loader = pl.ParallelLoader(train_data_loader, [self.device])
                 train_data_loader = train_para_loader.per_device_loader(self.device)
                 valid_para_loader = pl.ParallelLoader(valid_data_loader, [self.device])
@@ -60,8 +76,8 @@ class Fitter:
 
             self.lr.append(optimizer.param_group[0]['lr'])
 
-            train_loss, train_outputs, train_targets = train_epoch(self.model, train_data_loader, optimizer, self.cfg)
-            valid_loss, valid_outputs, valid_targets = valid_epoch(self.model, valid_data_loader, self.cfg)
+            train_loss, train_outputs, train_targets = train_epoch(self.model, train_data_loader, optimizer, self.hparams)
+            valid_loss, valid_outputs, valid_targets = valid_epoch(self.model, valid_data_loader, self.hparams)
 
             if optimizer.__class__.__name__ == "ReduceLROnPlateau":
                 scheduler.step(valid_loss)
@@ -75,7 +91,7 @@ class Fitter:
                                                     np.round(valid_outputs).astype(np.int))
             valid_auc = metrics.roc_auc_score(np.round(valid_targets).astype(np.int), valid_outputs)
 
-            if self.cfg.device == "TPU":
+            if self.hparams.device == "TPU":
                 self.logger.info(f"device = {xm.get_ordinal()}, train_acc = {train_accuracy}, train_auc = {train_auc}")
                 self.logger.info(f"device = {xm.get_ordinal()}, valid_acc = {valid_accuracy}, valid_auc = {valid_auc}")
                 train_fin_acc = xm.mesh_reduce("train_reduce_acc", train_accuracy, reduce_fn=reduce_fn)
@@ -93,13 +109,20 @@ class Fitter:
                 print(f"Epoch = {epoch + 1}, train_acc = {train_fin_acc}, train_auc = {train_fin_auc}")
                 print(f"Epoch = {epoch + 1}, valid_acc = {valid_fin_acc}, valid_auc = {valid_fin_auc}")
 
-            self.earlystopping(valid_fin_auc, self.model, f"model_{self.cfg.fold_idx}.bin")
+            self.earlystopping(valid_fin_auc, self.model, f"model_{self.hparams.fold_idx}.bin")
 
             if self.earlystopping.get_stop():
                 break
 
 
-    # def predict(self, test_data_loader):
+    def predict(self, model, data_loader):
+
+
+
+
+    def load_weights(self, path):
+
+
 
 
 

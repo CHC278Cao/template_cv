@@ -4,3 +4,5 @@
 @contact:
 """
 
+
+def make_net(cfg):
